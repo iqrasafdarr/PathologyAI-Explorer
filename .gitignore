@@ -1,0 +1,30 @@
+# Dataset files (never commit PCam to git)
+data/*.h5
+data/*.h5.gz
+data/*.csv
+
+# Checkpoints and large results
+results/checkpoints/
+*.pt
+*.pth
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Colab
+.ipynb_checkpoints

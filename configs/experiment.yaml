@@ -1,0 +1,60 @@
+# =============================================================================
+# PathologyAI Explorer — Experiment Configuration
+# Single source of truth. Code should read from this file rather than
+# hard-coding values. Phase 1 uses: seed, data, dataloader, device.
+# Phase 2 will use: model, training.
+# =============================================================================
+
+seed: 42
+
+# ---------------------------------------------------------------------------
+# Dataset paths (PCam HDF5 files, downloaded via scripts/download_data.py)
+# ---------------------------------------------------------------------------
+data:
+  root_dir: "data"
+  train_x: "camelyonpatch_level_2_split_train_x.h5"
+  train_y: "camelyonpatch_level_2_split_train_y.h5"
+  valid_x: "camelyonpatch_level_2_split_valid_x.h5"
+  valid_y: "camelyonpatch_level_2_split_valid_y.h5"
+  test_x: "camelyonpatch_level_2_split_test_x.h5"
+  test_y: "camelyonpatch_level_2_split_test_y.h5"
+  image_size: 96          # native PCam patch size (px)
+
+# ---------------------------------------------------------------------------
+# DataLoader settings
+# ---------------------------------------------------------------------------
+dataloader:
+  batch_size: 64
+  num_workers: 2           # set to 0 on Windows if multiprocessing issues occur
+  pin_memory: true         # ignored automatically when device is cpu
+
+# ---------------------------------------------------------------------------
+# Model (used starting Phase 2 — present now so the config is stable)
+# ---------------------------------------------------------------------------
+model:
+  name: "resnet50"
+  pretrained: true
+  num_classes: 2
+  freeze_backbone: false    # fine-tune all layers by default
+
+# ---------------------------------------------------------------------------
+# Training (used starting Phase 2 — present now so the config is stable)
+# ---------------------------------------------------------------------------
+training:
+  epochs: 10
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  checkpoint_dir: "results/checkpoints"
+
+# ---------------------------------------------------------------------------
+# Results / outputs
+# ---------------------------------------------------------------------------
+results:
+  figures_dir: "results/figures"
+  metrics_dir: "results/metrics"
+
+# ---------------------------------------------------------------------------
+# Device
+# ---------------------------------------------------------------------------
+device:
+  prefer: "cuda"   # falls back to "cpu" automatically if cuda is unavailable
