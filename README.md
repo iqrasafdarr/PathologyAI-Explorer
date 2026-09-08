@@ -30,43 +30,64 @@
 
 ## 🧭 Where This Fits: Patch Classification vs. Whole-Slide Diagnosis
 
-Whole-slide images are gigapixel-scale — far too large to feed directly into a CNN. The standard workaround is to classify small patches individually, then aggregate patch-level evidence into a single slide-level decision using MIL. This project currently implements the **patch classification pipeline** (left + middle of the diagram below); the **MIL aggregation stage** (right) is a documented, scoped exploration planned for a later phase.
+Whole-slide images are gigapixel-scale — far too large to feed directly into a CNN. PCam solves this by pre-extracting fixed-size patches; this project consumes exactly that. The diagram below shows the full conceptual path from raw slide to patch, and where this repo's implemented pipeline (green) currently ends.
 
 ```mermaid
+%%{init: {'theme':'dark', 'themeVariables': {'background':'#1a1a1a'}}}%%
 flowchart LR
-    A[Gigapixel<br/>Whole-Slide Image] -->|tiled into| B[Fixed-size<br/>Patches]
-    B --> C[Patch-Level<br/>CNN Classifier]
-    C -->|per-patch<br/>predictions| D[Attention-Based<br/>MIL Aggregation]
-    D --> E[Slide-Level<br/>Diagnosis]
+    A["🔬 Whole-Slide Image<br/>~100k × 100k px"]:::implemented --> B["🧫 Tissue Detection<br/>Filter background"]:::implemented
+    B --> C["✂️ Extract Patches<br/>96×96 crops"]:::implemented
+    C --> D["🟥 Patch 1<br/>Tumor"]:::patch
+    C --> E["🟩 Patch 2<br/>Normal"]:::patch
+    C --> F["🟦 Patch N<br/>Mixed"]:::patch
 
-    style B fill:#dff0d8,stroke:#3c763d
-    style C fill:#dff0d8,stroke:#3c763d
-    style D fill:#fcf8e3,stroke:#8a6d3b,stroke-dasharray: 5 5
-    style E fill:#fcf8e3,stroke:#8a6d3b,stroke-dasharray: 5 5
-
-    classDef done fill:#dff0d8,stroke:#3c763d;
-    classDef planned fill:#fcf8e3,stroke:#8a6d3b,stroke-dasharray: 5 5;
+    classDef implemented fill:#0e7c86,stroke:#0a5a61,color:#ffffff,font-weight:bold;
+    classDef patch fill:#8b3a3a,stroke:#5e2727,color:#ffffff,font-weight:bold;
 ```
+<sub><i>PCam dataset: ~327k patches, 2 classes (tumor / normal), sourced from ~400 slides · patch-level labels available; slide-level labels are withheld by design → the exact motivation for MIL (see below).</i></sub>
 
-**Legend:** 🟢 Green = implemented in this repo (patch pipeline) · 🟡 Yellow (dashed) = planned, scoped exploration (MIL / CLAM)
+---
+
+### 🎯 Planned Next Step: Attention-Based Slide Aggregation (Phase 3–4, not yet implemented)
+
+Once patch-level predictions exist, the standard CLAM-style approach learns an **attention weight (α)** per patch so the most diagnostically relevant patches drive the final slide-level call — no patch-level ground truth required during training. The diagram below illustrates the *mechanism*, not actual output from this repo.
+
+```mermaid
+%%{init: {'theme':'dark', 'themeVariables': {'background':'#1a1a1a'}}}%%
+flowchart TD
+    P1["P(tumor) = 0.92"]:::pred
+    P2["P(tumor) = 0.18"]:::pred
+    P3["P(tumor) = 0.76"]:::pred
+    P1 -->|"α = 0.40"| AGG["⚖️ Weighted Attention<br/>Aggregation"]:::agg
+    P2 -->|"α = 0.12"| AGG
+    P3 -->|"α = 0.28"| AGG
+    AGG --> OUT["✅ Slide Diagnosis"]:::out
+
+    classDef pred fill:#5c4a13,stroke:#3d3009,color:#ffffff,font-weight:bold;
+    classDef agg fill:#7a651f,stroke:#544512,color:#ffffff,font-weight:bold;
+    classDef out fill:#1e5233,stroke:#123222,color:#ffffff,font-weight:bold;
+```
+<sub><i>Illustrative example with placeholder numbers — for exposition only. This repo has not trained an attention/MIL model; see <a href="#-project-progress">Project Progress</a>.</i></sub>
+
+**Legend:** 🟢 Teal/Green = implemented in this repo · 🟡 Gold/dashed = conceptual, planned for a later phase (not yet built)
 
 ---
 
 ## ⚙️ Data Pipeline Architecture (Implemented — Phase 1)
 
 ```mermaid
+%%{init: {'theme':'dark', 'themeVariables': {'background':'#1a1a1a', 'primaryColor':'#0e7c86'}}}%%
 flowchart TD
-    A[("PCam HDF5 files<br/>(Zenodo mirror)")] --> B["download_data.py<br/>download + checksum verify"]
-    B --> C["decompress → data/"]
-    C --> D["PyTorch Dataset<br/>src/data/dataset.py"]
-    D --> E["Transform pipelines<br/>src/data/transforms.py<br/>(ImageNet norm + mild augmentation)"]
-    E --> F["DataLoader<br/>(multi-worker safe:<br/>Linux / Windows / Colab)"]
-    F --> G["Sanity Check<br/>--sanity-check"]
-    G --> H["Dataset sizes,<br/>class balance,<br/>tensor shapes"]
-    G --> I["results/figures/<br/>sample_patches.png"]
+    A[("PCam HDF5 files<br/>(Zenodo mirror)")]:::done --> B["download_data.py<br/>download + checksum verify"]:::done
+    B --> C["decompress → data/"]:::done
+    C --> D["PyTorch Dataset<br/>src/data/dataset.py"]:::done
+    D --> E["Transform pipelines<br/>src/data/transforms.py<br/>(ImageNet norm + mild augmentation)"]:::done
+    E --> F["DataLoader<br/>(multi-worker safe:<br/>Linux / Windows / Colab)"]:::done
+    F --> G["Sanity Check<br/>--sanity-check"]:::done
+    G --> H["Dataset sizes,<br/>class balance,<br/>tensor shapes"]:::done
+    G --> I["results/figures/<br/>sample_patches.png"]:::done
 
-    classDef done fill:#dff0d8,stroke:#3c763d;
-    class A,B,C,D,E,F,G,H,I done;
+    classDef done fill:#0e5c47,stroke:#0a3f30,color:#ffffff,font-weight:bold;
 ```
 
 Every box above corresponds to code that runs today — no placeholders, no stubs.
@@ -90,6 +111,20 @@ Every box above corresponds to code that runs today — no placeholders, no stub
 **Current status: Data pipeline implemented — model training pending.**
 
 ```mermaid
+flowchart LR
+    P1["Phase 1: Data Pipeline<br/>✅ Complete"]:::complete --> P2["Phase 2: Training Baseline<br/>ResNet50 + Metrics"]:::next
+    P2 --> P3["Phase 3: Documentation<br/>WSI / MIL Concepts"]:::later
+    P3 --> P4["Phase 4: CLAM Exploration<br/>If time permits"]:::later
+
+    classDef complete fill:#2f7d4f,stroke:#1e5233,color:#ffffff,font-weight:bold;
+    classDef next fill:#0e7c86,stroke:#0a5a61,color:#ffffff,font-weight:bold;
+    classDef later fill:#4a4fa0,stroke:#33366e,color:#ffffff,font-weight:bold;
+```
+
+<details>
+<summary><b>📅 Detailed timeline (click to expand)</b></summary>
+
+```mermaid
 gantt
     dateFormat  X
     axisFormat %s
@@ -106,6 +141,8 @@ gantt
     WSI-MIL conceptual docs + diagram      :p3a, 2, 3
     Scoped CLAM exploration                :p3b, 2, 3
 ```
+
+</details>
 
 | Component | Status |
 |---|:---:|
